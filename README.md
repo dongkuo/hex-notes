@@ -1,5 +1,4 @@
-# Hex Editor
-
-<p style="text-align: center">
-<img src="./src-tauri/icons/Square71x71Logo.png">
-</p>
+<h1 >
+<img src="./src-tauri/icons/Square44x44Logo.png" style="vertical-align: middle;">
+<span style="vertical-align: middle;">Hex Notes</span>
+</h1>
