@@ -1,5 +1,7 @@
 <script setup>
 import { reactive } from 'vue';
+import selectHandler from '../utils/selectHandler'
+import hoverHandler from '../utils/hoverHandler'
 
 const props = defineProps({
   modelValue: {
@@ -24,7 +26,7 @@ const data = reactive({
   buffer: [],
   hoverIndex: null,
   focusIndex: null,
-  selectMode: false
+  mode: 'n', // n: normal mode, s: select mode, e: edit mode
 })
 
 const editorWrapperStyle = reactive({
@@ -33,11 +35,49 @@ const editorWrapperStyle = reactive({
 
 initBuffer()
 
+selectHandler.register(
+  resolveIndex,
+  (index) => data.buffer[index].selected = !data.buffer[index].selected,
+  (index) => data.buffer[index].selected = !data.buffer[index].selected,
+  () => {
+    data.mode = 's'
+    cancelHover()
+  },
+  () => data.mode = 'n'
+)
+
+hoverHandler.register(
+  ele => {
+    if (data.mode === 's') {
+      return
+    }
+    const index = resolveIndex(ele)
+    data.buffer[index].hover = true
+    data.hoverIndex = index
+  },
+  ele => {
+    const index = resolveIndex(ele)
+    data.buffer[index].hover = false
+    data.hoverIndex = null
+  }
+)
+
+function resolveIndex(ele) {
+  return parseInt(ele.getAttribute('index'))
+}
+
 function initBuffer() {
   const bufferSize = props.rowNum * props.columnNum
   for (let i = 0; i < bufferSize; i++) {
     const value = props.modelValue[i] === undefined ? 0 : props.modelValue[i]
     data.buffer[i] = { value }
+  }
+}
+
+function cancelHover() {
+  if (data.hoverIndex !== null) {
+    data.buffer[data.hoverIndex].hover = false
+    data.hoverIndex = null
   }
 }
 
@@ -49,44 +89,6 @@ function buildGridTemplateColumnsStyle() {
     style += width + ' '
   }
   return style
-}
-
-let startSelectIndex = null
-let endSelectIndex = null
-function onClickDown(event) {
-  data.selectMode = true
-  startSelectIndex = parseInt(event.target.getAttribute('index'))
-  endSelectIndex = startSelectIndex
-  data.buffer[startSelectIndex].selected = true
-}
-
-function onClickUp(event) {
-  console.log('up:', startSelectIndex, endSelectIndex);
-  data.selectMode = false
-}
-
-function onClickMove(event) {
-  const index = parseInt(event.target.getAttribute('index'))
-  data.hoverIndex = index
-  if (!data.selectMode) {
-    return
-  }
-  const leftIndex = Math.min(startSelectIndex, index);
-  const rightIndex = Math.max(startSelectIndex, index);
-
-  if (endSelectIndex < leftIndex) {
-    for (let i = endSelectIndex; i < leftIndex; i++) {
-      data.buffer[i].selected = false
-    }
-  } else if (endSelectIndex > rightIndex) {
-    for (let i = rightIndex + 1; i <= endSelectIndex; i++) {
-      data.buffer[i].selected = false
-    }
-  }
-  for (let i = leftIndex; i <= rightIndex; i++) {
-    data.buffer[i].selected = true
-  }
-  endSelectIndex = index
 }
 
 function onMouseOutEditor() {
@@ -105,8 +107,9 @@ function num2hex(num) {
   </div>
   <div class="editor-wrapper" :style="editorWrapperStyle" @mouseout="onMouseOutEditor">
     <span v-for="(byte, index) in data.buffer" class="byte" :key="index + ':' + byte.value" :index="index"
-      :class="{ selected: byte.selected, hover: data.hoverIndex === index, selectMode: byte.selected && data.selectMode }"
-      @mousedown="onClickDown" @mouseup="onClickUp" @mousemove="onClickMove">
+      :class="{ selected: byte.selected, hover: byte.hover }" @mousedown="selectHandler.onMouseDown"
+      @mouseup="selectHandler.onMouseUp" @mousemove="selectHandler.onMouseMove" @mouseover="hoverHandler.onMouseOver"
+      @mouseout="hoverHandler.onMouseOut">
       {{ num2hex(byte.value) }}
     </span>
   </div>
@@ -129,14 +132,10 @@ function num2hex(num) {
 }
 
 .byte.selected {
-  background: #cce0f0fd;
+  background: #f5c953;
 }
 
 .byte.hover {
   background: #cccccc;
-}
-
-.byte.hover.selectMode {
-  background: #cce0f0fd !important;
 }
 </style>
